@@ -13,16 +13,26 @@ export function useCandidateManagement() {
     queryFn: getCandidates
   });
 
-  const { data: filteredBySkills = [] } = useQuery({
-    queryKey: ['candidates', 'skills', selectedSkills],
-    queryFn: () => getCandidatesBySkills(selectedSkills),
-    enabled: selectedSkills.length > 0
-  });
-
-  const { data: filteredByExperience = [] } = useQuery({
-    queryKey: ['candidates', 'experience', selectedRole],
-    queryFn: () => getCandidatesByExperience(selectedRole),
-    enabled: !!selectedRole
+  const { data: filteredCandidates = [] } = useQuery({
+    queryKey: ['candidates', 'filtered', selectedSkills, selectedRole],
+    queryFn: async () => {
+      let results = candidates;
+      
+      if (selectedSkills.length > 0) {
+        results = await getCandidatesBySkills(selectedSkills);
+      }
+      
+      if (selectedRole) {
+        const candidatesToFilter = selectedSkills.length > 0 ? results : candidates;
+        const roleFiltered = await getCandidatesByExperience(selectedRole);
+        results = candidatesToFilter.filter(c => 
+          roleFiltered.some(rc => rc.email === c.email)
+        );
+      }
+      
+      return results;
+    },
+    enabled: candidates.length > 0 && (selectedSkills.length > 0 || !!selectedRole)
   });
 
   const handleSelectCandidate = (candidate: Candidate) => {
@@ -35,10 +45,8 @@ export function useCandidateManagement() {
     setSelectedCandidates(selectedCandidates.filter(c => c.email !== email));
   };
 
-  const displayCandidates = filteredBySkills.length > 0 
-    ? filteredBySkills 
-    : filteredByExperience.length > 0 
-    ? filteredByExperience 
+  const displayCandidates = (selectedSkills.length > 0 || selectedRole) 
+    ? filteredCandidates 
     : candidates;
 
   return {
